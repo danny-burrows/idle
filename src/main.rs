@@ -1,8 +1,9 @@
 use std::{io};
 use tui::{
     backend::{Backend, CrosstermBackend},
-    widgets::{Block, Borders},
+    widgets::{Block, List, ListItem, ListState, Borders},
     layout::{Layout, Constraint, Direction},
+    style::{Style, Modifier, Color},
     Terminal,
     Frame
 };
@@ -33,6 +34,20 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
         .title("Sub Block")
         .borders(Borders::ALL);
     f.render_widget(block, chunks[1]);
+
+    let items = [ListItem::new("Item 1"), ListItem::new("Item 2"), ListItem::new("Item 3")];
+    let list = List::new(items)
+        .block(Block::default().title("List").borders(Borders::ALL))
+        .style(Style::default().fg(Color::White))
+        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
+        .highlight_symbol(">>");
+
+    let mut state = ListState::default();
+
+    state.select(Some(0));
+
+    f.render_stateful_widget(list, chunks[1], &mut state);
+
  }
 
 
