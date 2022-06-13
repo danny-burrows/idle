@@ -13,7 +13,12 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-fn ui<B: Backend>(f: &mut Frame<B>) {
+struct Idle<'a> {
+    incrementors: [&'a str; 3],
+    incrementors_state: ListState
+}
+
+fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .margin(1)
@@ -35,30 +40,50 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
         .borders(Borders::ALL);
     f.render_widget(block, chunks[1]);
 
-    let items = [ListItem::new("Item 1"), ListItem::new("Item 2"), ListItem::new("Item 3")];
+    let items = app.incrementors.map(|f| {ListItem::new(f)});
     let list = List::new(items)
         .block(Block::default().title("List").borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
         .highlight_symbol(">>");
 
-    let mut state = ListState::default();
-
-    state.select(Some(0));
-
-    f.render_stateful_widget(list, chunks[1], &mut state);
-
- }
+    f.render_stateful_widget(list, chunks[1], &mut app.incrementors_state);
+}
 
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
+    
+    let mut app = Idle {
+        incrementors: ["Incrementor 1", "Incrementor 2", "Incrementor 3"],
+        incrementors_state: ListState::default()
+    };
+
+    app.incrementors_state.select(Some(0));
+    
     loop {
-        terminal.draw(ui)?;
+        terminal.draw(|frame| ui(frame, &mut app))?;
 
         if let Event::Key(key) = event::read()? {
-            if let KeyCode::Char('q') = key.code {
-                return Ok(());
+
+            match key.code {
+                KeyCode::Char('q') => return Ok(()),
+                KeyCode::Up => {
+                    let current_select = app.incrementors_state.selected();
+                    
+                    if current_select != None && current_select.unwrap() > 0 {
+                        app.incrementors_state.select(Some(current_select.unwrap() - 1));
+                    }
+                },
+                KeyCode::Down => {
+                    let current_select = app.incrementors_state.selected();
+
+                    if current_select != None && current_select.unwrap() < 2 {
+                        app.incrementors_state.select(Some(current_select.unwrap() + 1));
+                    }
+                },
+                _ => {}
             }
+
         }
     }
 }
