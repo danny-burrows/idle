@@ -9,19 +9,19 @@ use tui::{
     Frame
 };
 
-fn style_title<'a>(txt: &'a str) -> Span<'a> { 
+fn style_title<'a>(title_text: &'a str) -> Span<'a> { 
     Span::styled(
-        txt,
+        title_text,
         Style::default()
             .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
+            .add_modifier(Modifier::BOLD)
     )
 }
 
 pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .margin(0)
+        .margin(1)
         .constraints(
             [
                 Constraint::Percentage(75),
@@ -86,18 +86,15 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
     f.render_widget(sparkline, main_chunks[0]);
 
     let mut use_data = vec![];
-    let mut i = 0;
+    let mut i = 0.0;
     for it in &app.graph_data {
-        use_data.push((i as f64, *it as f64));
-        i += 1;
+        use_data.push((i, *it as f64));
+        i += 1.0;
     }
 
-
-    let mut max_y = 10;
-
-    let t = app.graph_data.iter().max();
-    if t != None {
-        max_y = *t.unwrap();
+    let mut max_y = 10.0;
+    if let Some(t) = app.graph_data.iter().max() {
+        max_y = *t as f64 * 1.15;
     }
 
     let datasets = vec![Dataset::default()
@@ -121,11 +118,11 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
             Axis::default()
                 .title("Total Clicks")
                 .style(Style::default().fg(Color::Gray))
-                .bounds([0.0, max_y as f64])
+                .bounds([0.0, max_y])
                 .labels(vec![
                     Span::styled("0", Style::default().add_modifier(Modifier::BOLD)),
                     Span::raw("2.5"),
-                    Span::styled(format!("{}", max_y as f64), Style::default().add_modifier(Modifier::BOLD)),
+                    Span::styled(format!("{:.0}", max_y), Style::default().add_modifier(Modifier::BOLD)),
                 ]),
         );
     f.render_widget(chart, main_chunks[1]);
