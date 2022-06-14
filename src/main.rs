@@ -20,18 +20,18 @@ struct Incrementors {
 
 impl Incrementors {
     fn next(&mut self) {
-        let current_select = self.state.selected();
-
-        if current_select != None && current_select.unwrap() < self.list.len() - 1 {
-            self.state.select(Some(current_select.unwrap() + 1));
+        if let Some(current_select) = self.state.selected() {
+            if current_select < self.list.len() - 1 {
+                self.state.select(Some(current_select + 1));
+            }
         }
     }
 
     fn prev(&mut self) {
-        let current_select = self.state.selected();
-
-        if current_select != None && current_select.unwrap() > 0 {
-            self.state.select(Some(current_select.unwrap() - 1));
+        if let Some(current_select) = self.state.selected() {
+            if current_select > 0 {
+                self.state.select(Some(current_select - 1));
+            }
         }
     }
 }
