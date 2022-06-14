@@ -7,9 +7,7 @@ use tui::{
     widgets::ListState,
     Terminal,
 };
-use crossterm::{
-    event::{self, Event, KeyCode},
-};
+use crossterm::event::{self, Event, KeyCode};
 use crate::ui::ui;
 
 pub struct Incrementors {
@@ -40,12 +38,20 @@ pub struct Idle {
     pub inc: u64,
     pub sparkline_max_length: usize,
     pub sparkline_data: Vec<u64>,
+    pub graph_data: Vec<u64>,
     pub incrementors: Incrementors
 }
 
 impl Idle {
     fn on_tick(&mut self) {
         self.sparkline_data.push(self.inc);
+        
+        self.graph_data.push(self.total_clicks);
+        
+        if self.graph_data.len() > 1000 {
+            self.graph_data.remove(0);
+        }
+
         self.inc = 0;
     }
 }
@@ -59,6 +65,7 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
         inc: 0,
         sparkline_max_length: 0,
         sparkline_data: vec![],
+        graph_data: vec![],
         incrementors: Incrementors { 
             list: vec!["Incrementor 1".to_string(), "Incrementor 2".to_string(), "Incrementor 3".to_string()], 
             state: ListState::default() 
@@ -87,6 +94,11 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
 
                         app.inc += i;
                         app.total_clicks += i;
+                    },
+                    KeyCode::Char('s') => {
+                        if app.total_clicks >= 10 {
+                            app.total_clicks -= 10;
+                        }
                     },
                     _ => {}
                 }
