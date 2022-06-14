@@ -13,9 +13,31 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 
-struct Idle<'a> {
-    incrementors: [&'a str; 3],
-    incrementors_state: ListState
+struct Incrementors {
+    list: Vec<String>,
+    state: ListState
+}
+
+impl Incrementors {
+    fn next(&mut self) {
+        let current_select = self.state.selected();
+
+        if current_select != None && current_select.unwrap() < self.list.len() - 1 {
+            self.state.select(Some(current_select.unwrap() + 1));
+        }
+    }
+
+    fn prev(&mut self) {
+        let current_select = self.state.selected();
+
+        if current_select != None && current_select.unwrap() > 0 {
+            self.state.select(Some(current_select.unwrap() - 1));
+        }
+    }
+}
+
+struct Idle {
+    incrementors: Incrementors
 }
 
 fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
@@ -40,25 +62,27 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
         .borders(Borders::ALL);
     f.render_widget(block, chunks[1]);
 
-    let items = app.incrementors.map(|f| {ListItem::new(f)});
+    let items: Vec<ListItem> = app.incrementors.list.iter().map(|f| ListItem::new(f.as_ref())).collect();
     let list = List::new(items)
         .block(Block::default().title("List").borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
         .highlight_symbol(">>");
 
-    f.render_stateful_widget(list, chunks[1], &mut app.incrementors_state);
+    f.render_stateful_widget(list, chunks[1], &mut app.incrementors.state);
 }
 
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
     
     let mut app = Idle {
-        incrementors: ["Incrementor 1", "Incrementor 2", "Incrementor 3"],
-        incrementors_state: ListState::default()
+        incrementors: Incrementors { 
+            list: vec!["Incrementor 1".to_string(), "Incrementor 2".to_string(), "Incrementor 3".to_string()], 
+            state: ListState::default() 
+        }
     };
 
-    app.incrementors_state.select(Some(0));
+    app.incrementors.state.select(Some(0));
     
     loop {
         terminal.draw(|frame| ui(frame, &mut app))?;
@@ -67,20 +91,8 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
 
             match key.code {
                 KeyCode::Char('q') => return Ok(()),
-                KeyCode::Up => {
-                    let current_select = app.incrementors_state.selected();
-                    
-                    if current_select != None && current_select.unwrap() > 0 {
-                        app.incrementors_state.select(Some(current_select.unwrap() - 1));
-                    }
-                },
-                KeyCode::Down => {
-                    let current_select = app.incrementors_state.selected();
-
-                    if current_select != None && current_select.unwrap() < 2 {
-                        app.incrementors_state.select(Some(current_select.unwrap() + 1));
-                    }
-                },
+                KeyCode::Up => app.incrementors.prev(),
+                KeyCode::Down => app.incrementors.next(),
                 _ => {}
             }
 
