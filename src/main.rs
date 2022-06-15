@@ -1,11 +1,9 @@
 mod ui;
 mod app;
 
-use std::{
-    io 
-};
+use std::io;
 use tui::{
-    backend::{CrosstermBackend},
+    backend::CrosstermBackend,
     Terminal,
 };
 use crossterm::{

@@ -1,6 +1,6 @@
 use crate::app::Idle;
 use tui::{
-    backend::{Backend},
+    backend::Backend,
     widgets::{Block, List, ListItem, Borders, LineGauge, Sparkline, Paragraph, Chart, Axis, Dataset, GraphType},
     layout::{Layout, Rect, Alignment, Constraint, Direction},
     style::{Style, Modifier, Color},
@@ -19,7 +19,24 @@ fn style_title<'a>(title_text: &'a str) -> Span<'a> {
 }
 
 fn draw_shop_chunk<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
-    let items: Vec<ListItem> = app.incrementors.list.iter().map(|f| ListItem::new(f.as_ref())).collect();
+    let items: Vec<ListItem> = app.incrementors.list.iter().map(|f| {
+        ListItem::new(
+            format!(
+                "{} (x{}) | Price: {:.2} | Earned: {:.2} ({:.0}%)", 
+                f.name, 
+                f.cores, 
+                f.price, 
+                f.earned_clicks, 
+                (f.earned_clicks / app.all_time_total_clicks) * 100.0)
+        ).style(
+            if f.price <= app.total_clicks {
+                Style::default().fg(Color::Green)
+            } else {
+                Style::default()
+            }
+        )
+    }).collect();
+
     let list = List::new(items)
         .block(Block::default().title(style_title("Shop")).borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
@@ -71,8 +88,8 @@ fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     }
 
     let mut max_y = 10.0;
-    if let Some(t) = app.graph_data.iter().max() {
-        max_y = *t as f64 * 1.15;
+    if let Some(t) = app.graph_data.clone().into_iter().reduce(f64::max) {
+        max_y = t * 1.15;
     }
 
     let datasets = vec![Dataset::default()
@@ -154,7 +171,7 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
     .title(style_title("Main Block"))
     .borders(Borders::ALL);
 
-    let paragraph = Paragraph::new(format!("Clicks {}", app.total_clicks))
+    let paragraph = Paragraph::new(format!("Clicks {:.2}", app.total_clicks))
         .style(Style::default().fg(Color::Gray))
         .block(block)
         .alignment(Alignment::Center);
