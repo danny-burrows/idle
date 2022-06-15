@@ -2,7 +2,7 @@ use crate::app::Idle;
 use tui::{
     backend::{Backend},
     widgets::{Block, List, ListItem, Borders, LineGauge, Sparkline, Paragraph, Chart, Axis, Dataset, GraphType},
-    layout::{Layout, Alignment, Constraint, Direction},
+    layout::{Layout, Rect, Alignment, Constraint, Direction},
     style::{Style, Modifier, Color},
     text::Span,
     symbols,
@@ -18,43 +18,19 @@ fn style_title<'a>(title_text: &'a str) -> Span<'a> {
     )
 }
 
-pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .margin(1)
-        .constraints(
-            [
-                Constraint::Percentage(75),
-                Constraint::Percentage(25)
-            ].as_ref()
-        )
-        .split(f.size());
-
+fn draw_shop_chunk<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
     let items: Vec<ListItem> = app.incrementors.list.iter().map(|f| ListItem::new(f.as_ref())).collect();
     let list = List::new(items)
-        .block(Block::default().title(style_title("List")).borders(Borders::ALL))
+        .block(Block::default().title(style_title("Shop")).borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::UNDERLINED).add_modifier(Modifier::BOLD))
-        .highlight_symbol(">>");
+        .highlight_style(Style::default().add_modifier(Modifier::ITALIC).add_modifier(Modifier::BOLD))
+        .highlight_symbol("> ");
 
-    f.render_stateful_widget(list, chunks[1], &mut app.incrementors.state);
+    f.render_stateful_widget(list, chunk_rect, &mut app.incrementors.state);
+}
 
-
-    // Left Chunk
-    let main_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(0)
-        .constraints(
-            [
-                Constraint::Percentage(25),
-                Constraint::Percentage(50),
-                Constraint::Min(2),
-                Constraint::Percentage(20),
-            ].as_ref()
-        )
-        .split(chunks[0]);
-
-    let sparkline_width = main_chunks[0].width.into();
+fn draw_sparkline<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
+    let sparkline_width = rect.width.into();
     app.sparkline_max_length = sparkline_width;
 
 
@@ -83,8 +59,10 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
         .style(Style::default().fg(Color::Green))
         .data(&app.sparkline_data)
         .bar_set(symbols::bar::NINE_LEVELS);
-    f.render_widget(sparkline, main_chunks[0]);
+    f.render_widget(sparkline, rect);
+}
 
+fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     let mut use_data = vec![];
     let mut i = 0.0;
     for it in &app.graph_data {
@@ -125,22 +103,59 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
                     Span::styled(format!("{:.0}", max_y), Style::default().add_modifier(Modifier::BOLD)),
                 ]),
         );
-    f.render_widget(chart, main_chunks[1]);
+    f.render_widget(chart, rect);
+}
 
+fn draw_loading_bar<B: Backend>(f: &mut Frame<B>, _app: &mut Idle, rect: Rect) {
     let line_gauge = LineGauge::default()
         .block(Block::default().title(style_title("LineGauge")))
         .gauge_style(Style::default().fg(Color::Magenta))
         .line_set(symbols::line::NORMAL)
-        .ratio(0.69);
-    f.render_widget(line_gauge, main_chunks[2]);
+        .ratio(0.20);
+    f.render_widget(line_gauge, rect);
+}
 
+pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(1)
+        .constraints(
+            [
+                Constraint::Percentage(75),
+                Constraint::Percentage(25)
+            ].as_ref()
+        )
+        .split(f.size());
+
+    // Right Chunk
+    draw_shop_chunk(f, app, chunks[1]);
+
+    // Left Chunk
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(0)
+        .constraints(
+            [
+                Constraint::Percentage(25),
+                Constraint::Percentage(50),
+                Constraint::Min(2),
+                Constraint::Percentage(20),
+            ].as_ref()
+        )
+        .split(chunks[0]);
+
+    draw_sparkline(f, app, main_chunks[0]);
+
+    draw_graph(f, app, main_chunks[1]);
+
+    draw_loading_bar(f, app, main_chunks[2]);
 
     let block = Block::default()
     .title(style_title("Main Block"))
     .borders(Borders::ALL);
 
     let paragraph = Paragraph::new(format!("Clicks {}", app.total_clicks))
-        .style(Style::default().fg(Color::Red))
+        .style(Style::default().fg(Color::Gray))
         .block(block)
         .alignment(Alignment::Center);
     f.render_widget(paragraph, main_chunks[3]);
