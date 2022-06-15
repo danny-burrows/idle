@@ -8,7 +8,7 @@ use tui::{
     Terminal,
 };
 use crossterm::event::{self, Event, KeyCode};
-use crate::ui::ui;
+use crate::ui::draw_ui;
 
 pub struct Incrementor {
     pub name: &'static str,
@@ -20,6 +20,12 @@ pub struct Incrementor {
     pub earned_clicks: f64,
     pub price: f64,
     pub price_mult: f64
+}
+
+impl Incrementor {
+    pub fn get_tick_amount(&self) -> f64 {
+        self.increment_by * self.cores as f64
+    }
 }
 
 pub struct Incrementors {
@@ -43,6 +49,10 @@ impl Incrementors {
             }
         }
     }
+
+    pub fn get_tick_amount(&self) -> f64 {
+        self.list.iter().map(|inc| inc.get_tick_amount()).sum()
+    }
 }
 
 pub struct Idle {
@@ -59,8 +69,7 @@ impl Idle {
     fn on_tick(&mut self) {
 
         for incrementor in self.incrementors.list.iter_mut() {
-            
-            let i = incrementor.increment_by * incrementor.cores as f64;
+            let i = incrementor.get_tick_amount();
             
             incrementor.earned_clicks += i;
             self.total_clicks += i;
@@ -141,7 +150,7 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
     
     let mut last_tick = Instant::now();
     loop {
-        terminal.draw(|frame| ui(frame, &mut app))?;
+        terminal.draw(|frame| draw_ui(frame, &mut app))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())

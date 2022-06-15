@@ -2,7 +2,7 @@ use crate::app::Idle;
 use tui::{
     backend::Backend,
     widgets::{Block, List, ListItem, Borders, LineGauge, Sparkline, Paragraph, Chart, Axis, Dataset, GraphType},
-    layout::{Layout, Rect, Alignment, Constraint, Direction},
+    layout::{Layout, Rect, Constraint, Direction},
     style::{Style, Modifier, Color},
     text::Span,
     symbols,
@@ -18,19 +18,72 @@ fn style_title<'a>(title_text: &'a str) -> Span<'a> {
     )
 }
 
-fn draw_shop_chunk<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
-    let items: Vec<ListItem> = app.incrementors.list.iter().map(|f| {
+fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
+
+    // Draw stats border.
+    let border_block = Block::default()
+        .title(style_title(" Stats "))
+        .borders(Borders::ALL);
+    f.render_widget(border_block, chunk_rect);
+
+
+    // Get the required number of constraints for all incrementors.
+    let mut constraints: Vec<Constraint> = app.incrementors.list.iter().map(|_f| Constraint::Length(3)).collect();
+
+    // Extra constraint for stats.
+    constraints.push(Constraint::Percentage(20));
+
+    let stats_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(2)
+        .constraints(constraints)
+        .split(chunk_rect);
+
+    // Draw all incrementor gauges.
+    let mut chnk = 0;
+    for incrementor in app.incrementors.list.iter() {
+
+        let r = incrementor.get_tick_amount() / app.incrementors.get_tick_amount();
+        
+        let line_gauge = LineGauge::default()
+            .block(Block::default().title(format!("{} +{:.2} (Total Earned: {:.2})", incrementor.name, incrementor.get_tick_amount(), incrementor.earned_clicks)))
+            .gauge_style(Style::default().fg(Color::Magenta))
+            .line_set(symbols::line::NORMAL)
+            .ratio(
+                if r.is_nan() {0.0} else {r}
+            );
+
+        f.render_widget(line_gauge, stats_chunks[chnk]);
+        chnk += 1;
+    }
+
+    // Draw stats block.
+    let block = Block::default()
+        .borders(Borders::TOP);
+    
+    let paragraph = Paragraph::new(
+        format!(
+            "\nClicks: {:.2} (+ {:.2})\n\nAll Time Clicks: {:.2}",
+            app.total_clicks,
+            app.incrementors.get_tick_amount(),
+            app.all_time_total_clicks
+        ))
+        .block(block);
+    f.render_widget(paragraph, stats_chunks[chnk]);
+}
+
+fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
+    let items: Vec<ListItem> = app.incrementors.list.iter().map(|incr| {
         ListItem::new(
             format!(
-                "{} (x{}) | Price: {:.2} | Earned: {:.2} ({:.0}%)", 
-                f.name, 
-                f.cores, 
-                f.price, 
-                f.earned_clicks, 
-                (f.earned_clicks / app.all_time_total_clicks) * 100.0)
+                "{} (x{}) | Price: {:.2}", 
+                incr.name, 
+                incr.cores, 
+                incr.price)
         ).style(
-            if f.price <= app.total_clicks {
-                Style::default().fg(Color::Green)
+            // Style item green if it can be purchased.
+            if incr.price <= app.total_clicks {
+                Style::default().fg(Color::LightGreen)
             } else {
                 Style::default()
             }
@@ -38,8 +91,7 @@ fn draw_shop_chunk<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rec
     }).collect();
 
     let list = List::new(items)
-        .block(Block::default().title(style_title("Shop")).borders(Borders::ALL))
-        .style(Style::default().fg(Color::White))
+        .block(Block::default().title(style_title(" Shop ")).borders(Borders::ALL))
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC).add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
@@ -50,18 +102,14 @@ fn draw_sparkline<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     let sparkline_width = rect.width.into();
     app.sparkline_max_length = sparkline_width;
 
-
-    if app.sparkline_data.len() > sparkline_width {
-        
-        let kill_old = app.sparkline_data.len() - sparkline_width;
-
-        app.sparkline_data.drain(0..kill_old);
+    // Drain overflowing data
+    if app.sparkline_data.len() > sparkline_width {        
+        app.sparkline_data.drain(0..(app.sparkline_data.len() - sparkline_width));
     }
 
-    let clicks_this_tick = if app.sparkline_data.len() > 0 {
-        app.sparkline_data[app.sparkline_data.len() - 1]
-    } else {
-        0
+    let clicks_this_tick = match app.sparkline_data.last().copied() {
+        Some(i) => i, 
+        _ => 0
     };
 
     let avg_clicks_per_tick = {
@@ -69,10 +117,10 @@ fn draw_sparkline<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
         sum as f64 / (app.sparkline_data.len() as f64)
     };
 
-    let titlett = format!("Clicks / Tick (This Tick: {}) (Avg: {:.2})", clicks_this_tick, avg_clicks_per_tick);
+    let titlett = format!(" Clicks / Tick (This Tick: {}) (Avg: {:.2}) ", clicks_this_tick, avg_clicks_per_tick);
 
     let sparkline = Sparkline::default()
-        .block(Block::default().title(style_title(titlett.as_str())))
+        .block(Block::default().title(style_title(titlett.as_str())).borders(Borders::ALL))
         .style(Style::default().fg(Color::Green))
         .data(&app.sparkline_data)
         .bar_set(symbols::bar::NINE_LEVELS);
@@ -80,20 +128,20 @@ fn draw_sparkline<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
 }
 
 fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
-    let mut use_data = vec![];
-    let mut i = 0.0;
-    for it in &app.graph_data {
-        use_data.push((i, *it as f64));
-        i += 1.0;
-    }
 
+    // Enumerate graph (y) data with its index (x).
+    let use_data: Vec<(f64, f64)> = app.graph_data.iter().enumerate().map(|(i, it)| (i as f64, *it)).collect();
+
+    // Calculate max y value for graph.
     let mut max_y = 10.0;
     if let Some(t) = app.graph_data.clone().into_iter().reduce(f64::max) {
-        max_y = t * 1.15;
+        if t > 10.0 {
+            max_y = t * 1.15;
+        }
     }
 
     let datasets = vec![Dataset::default()
-        .name("data")
+        .name("Current Clicks")
         .marker(symbols::Marker::Braille)
         .style(Style::default().fg(Color::Yellow))
         .graph_type(GraphType::Line)
@@ -101,7 +149,7 @@ fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     let chart = Chart::new(datasets)
         .block(
             Block::default()
-                .title(style_title("Total Clicks / Ticks"))
+                .title(style_title(" Total Clicks "))
                 .borders(Borders::ALL),
         )
         .x_axis(
@@ -111,8 +159,6 @@ fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
         )
         .y_axis(
             Axis::default()
-                .title("Total Clicks")
-                .style(Style::default().fg(Color::Gray))
                 .bounds([0.0, max_y])
                 .labels(vec![
                     Span::styled("0", Style::default().add_modifier(Modifier::BOLD)),
@@ -123,19 +169,53 @@ fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     f.render_widget(chart, rect);
 }
 
-fn draw_loading_bar<B: Backend>(f: &mut Frame<B>, _app: &mut Idle, rect: Rect) {
-    let line_gauge = LineGauge::default()
-        .block(Block::default().title(style_title("LineGauge")))
-        .gauge_style(Style::default().fg(Color::Magenta))
-        .line_set(symbols::line::NORMAL)
-        .ratio(0.20);
-    f.render_widget(line_gauge, rect);
+fn draw_chat<B: Backend>(f: &mut Frame<B>, _app: &mut Idle, rect: Rect) {
+    let block = Block::default()
+    .title(style_title(" Chat "))
+    .borders(Borders::ALL);
+
+    let paragraph = Paragraph::new(format!(" Director: Welcome to idle."))
+        .block(block);
+    f.render_widget(paragraph, rect);
 }
 
-pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
+fn draw_main_panel<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
+    let chunks = Layout::default()
+    .direction(Direction::Vertical)
+    .margin(0)
+    .constraints(
+        [
+            Constraint::Percentage(25),
+            Constraint::Percentage(55),
+            Constraint::Percentage(20),
+        ].as_ref()
+    )
+    .split(rect);
+
+    draw_sparkline(f, app, chunks[0]);
+    draw_graph(f, app, chunks[1]);
+    draw_chat(f, app, chunks[2]);    
+}
+
+fn draw_sidebar<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {    
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(0)
+        .constraints(
+            [
+                Constraint::Percentage(50),
+                Constraint::Percentage(50)
+            ].as_ref()
+        )
+        .split(chunk_rect);
+
+    draw_stats(f, app, chunks[0]);    
+    draw_shop(f, app, chunks[1]);
+}
+
+pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .margin(1)
         .constraints(
             [
                 Constraint::Percentage(75),
@@ -144,36 +224,6 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
         )
         .split(f.size());
 
-    // Right Chunk
-    draw_shop_chunk(f, app, chunks[1]);
-
-    // Left Chunk
-    let main_chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(0)
-        .constraints(
-            [
-                Constraint::Percentage(25),
-                Constraint::Percentage(50),
-                Constraint::Min(2),
-                Constraint::Percentage(20),
-            ].as_ref()
-        )
-        .split(chunks[0]);
-
-    draw_sparkline(f, app, main_chunks[0]);
-
-    draw_graph(f, app, main_chunks[1]);
-
-    draw_loading_bar(f, app, main_chunks[2]);
-
-    let block = Block::default()
-    .title(style_title("Main Block"))
-    .borders(Borders::ALL);
-
-    let paragraph = Paragraph::new(format!("Clicks {:.2}", app.total_clicks))
-        .style(Style::default().fg(Color::Gray))
-        .block(block)
-        .alignment(Alignment::Center);
-    f.render_widget(paragraph, main_chunks[3]);
+    draw_main_panel(f, app, chunks[0]);
+    draw_sidebar(f, app, chunks[1]);
 }
