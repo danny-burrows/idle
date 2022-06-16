@@ -79,7 +79,7 @@ fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
         ListItem::new(
             Spans::from(vec![
                 Span::styled("• ", Style::default().fg(incr.colour)),
-                Span::raw(format!("{:<23} {:.2}", incr.name, incr.price)),
+                Span::raw(format!("{:<23} {:.2}", (if incr.unlocked {incr.name} else {"Purchase to Unlock"}), incr.price)),
             ])
         ).style(
             // Style item green if it can be purchased.
