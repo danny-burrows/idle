@@ -9,7 +9,7 @@ use tui::{
     Frame
 };
 
-fn style_title<'a>(title_text: &'a str) -> Span<'a> { 
+fn style_title(title_text: &str) -> Span { 
     Span::styled(
         title_text,
         Style::default()
@@ -175,7 +175,7 @@ fn draw_chat<B: Backend>(f: &mut Frame<B>, _app: &mut Idle, rect: Rect) {
     .title(style_title(" Chat "))
     .borders(Borders::ALL);
 
-    let paragraph = Paragraph::new(format!(" Director: Welcome to idle."))
+    let paragraph = Paragraph::new(" Director: Welcome to idle.".to_string())
         .block(block);
     f.render_widget(paragraph, rect);
 }

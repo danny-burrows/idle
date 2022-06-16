@@ -46,7 +46,7 @@ impl Incrementor {
             self.total_earned += c;
             return c;
         }
-        return 0.0;
+        0.0
     }
 }
 
@@ -222,7 +222,7 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
                                 incrementor.increment_by *= 1.23;
                                 incrementor.max_clicks *= 1.2;
                                 
-                                incrementor.price = incrementor.price * incrementor.price_mult;
+                                incrementor.price *= incrementor.price_mult;
                             } else {
                                 incrementor.unlocked = true;
                             }
