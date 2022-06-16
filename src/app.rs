@@ -5,6 +5,7 @@ use std::{
 use tui::{
     backend::{Backend},
     widgets::ListState,
+    style::Color,
     Terminal,
 };
 use crossterm::event::{self, Event, KeyCode};
@@ -12,24 +13,45 @@ use crate::ui::draw_ui;
 
 pub struct Incrementor {
     pub name: &'static str,
-    pub cores: u64,
+    pub colour: Color,
 
-    increment_by: f64,
+    pub clicks: f64,
+    pub max_clicks: f64,
+
+    pub increment_by: f64,
+
+    pub spare: f64,
 
     // Stats
-    pub earned_clicks: f64,
+    pub total_earned: f64,
+
+    pub unlocked: bool,
     pub price: f64,
     pub price_mult: f64
 }
 
 impl Incrementor {
-    pub fn get_tick_amount(&self) -> f64 {
-        self.increment_by * self.cores as f64
+    // Return value is clicks to add to global pool.
+    pub fn tick(& mut self) -> f64 {
+        self.clicks += self.increment_by;
+
+        // Check for overflow.
+        if self.clicks >= self.max_clicks {
+            self.spare += self.clicks - self.max_clicks;
+        
+            let c = self.clicks;
+
+            self.clicks = 0.0;
+            
+            self.total_earned += c;
+            return c;
+        }
+        return 0.0;
     }
 }
 
 pub struct Incrementors {
-    pub list: Vec<Incrementor>,
+    pub list: [Incrementor; 5],
     pub state: ListState
 }
 
@@ -49,10 +71,6 @@ impl Incrementors {
             }
         }
     }
-
-    pub fn get_tick_amount(&self) -> f64 {
-        self.list.iter().map(|inc| inc.get_tick_amount()).sum()
-    }
 }
 
 pub struct Idle {
@@ -69,9 +87,11 @@ impl Idle {
     fn on_tick(&mut self) {
 
         for incrementor in self.incrementors.list.iter_mut() {
-            let i = incrementor.get_tick_amount();
             
-            incrementor.earned_clicks += i;
+            if !incrementor.unlocked {continue;}
+            
+            let i = incrementor.tick();
+
             self.total_clicks += i;
             self.all_time_total_clicks += i;
             self.inc += i.round() as u64;
@@ -101,46 +121,71 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
         sparkline_data: vec![],
         graph_data: vec![],
         incrementors: Incrementors { 
-            list: vec![
+            list: [
                 Incrementor {
                     name: "Incrementor",
+                    colour: Color::LightBlue,
+                    unlocked: true,
+
+                    clicks:0.0,
+                    spare: 0.0,
                     increment_by: 0.1,
-                    cores: 0,
-                    earned_clicks: 1.0,
+                    max_clicks: 1.0,
+                    total_earned: 0.0,
                     price: 1.0,
                     price_mult: 1.5
                 },
                 Incrementor {
                     name: "Better Incrementor",
-                    increment_by: 0.2,
-                    cores: 0,
-                    earned_clicks: 0.0,
-                    price: 5.0,
+                    colour: Color::LightGreen,
+                    unlocked: false,
+
+                    clicks:0.0,
+                    spare: 0.0,
+                    increment_by: 0.5,
+                    max_clicks: 5.0,
+                    total_earned: 0.0,
+                    price: 100.0,
                     price_mult: 1.5
                 },
                 Incrementor {
                     name: "Improved Incrementor",
-                    increment_by: 1.0,
-                    cores: 0,
-                    earned_clicks: 0.0,
-                    price: 30.0,
-                    price_mult: 1.5
+                    colour: Color::Yellow,
+                    unlocked: false,
+
+                    clicks:0.0,
+                    spare: 0.0,
+                    increment_by: 1.5,
+                    max_clicks: 10.0,
+                    total_earned: 0.0,
+                    price: 1000.0,
+                    price_mult: 2.0
                 },
                 Incrementor {
                     name: "Super Incrementor",
+                    colour: Color::LightRed,
+                    unlocked: false,
+                    
+                    clicks:0.0,
+                    spare: 0.0,
                     increment_by: 3.0,
-                    cores: 0,
-                    earned_clicks: 0.0,
-                    price: 50.0,
+                    max_clicks: 50.0,
+                    total_earned: 0.0,
+                    price: 5000.0,
                     price_mult: 2.0
                 },
                 Incrementor {
                     name: "God Mode.",
-                    increment_by: 100.0,
-                    cores: 0,
-                    earned_clicks: 0.0,
-                    price: 10000.0,
-                    price_mult: 10.0
+                    colour: Color::LightMagenta,
+                    unlocked: false,
+
+                    clicks:0.0,
+                    spare: 0.0,
+                    increment_by: 10.0,
+                    max_clicks: 100.0,
+                    total_earned: 0.0,
+                    price: 50000.0,
+                    price_mult: 2.5
                 }],
             state: ListState::default() 
         }
@@ -172,9 +217,15 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
                         // Attempt purchase.
                         if app.total_clicks >= incrementor.price {
                             app.total_clicks -= incrementor.price;
-                            incrementor.cores += 1;
-                            
-                            incrementor.price = incrementor.price * incrementor.price_mult;
+
+                            if incrementor.unlocked {
+                                incrementor.increment_by *= 1.23;
+                                incrementor.max_clicks *= 1.2;
+                                
+                                incrementor.price = incrementor.price * incrementor.price_mult;
+                            } else {
+                                incrementor.unlocked = true;
+                            }
                         }
 
                     },

@@ -4,7 +4,7 @@ use tui::{
     widgets::{Block, List, ListItem, Borders, LineGauge, Sparkline, Paragraph, Chart, Axis, Dataset, GraphType},
     layout::{Layout, Rect, Constraint, Direction},
     style::{Style, Modifier, Color},
-    text::Span,
+    text::{Spans, Span},
     symbols,
     Frame
 };
@@ -28,7 +28,7 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
 
 
     // Get the required number of constraints for all incrementors.
-    let mut constraints: Vec<Constraint> = app.incrementors.list.iter().map(|_f| Constraint::Length(3)).collect();
+    let mut constraints: Vec<Constraint> = app.incrementors.list.iter().filter(|i| i.unlocked).map(|_f| {Constraint::Length(3)}).collect();
 
     // Extra constraint for stats.
     constraints.push(Constraint::Percentage(20));
@@ -43,11 +43,13 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
     let mut chnk = 0;
     for incrementor in app.incrementors.list.iter() {
 
-        let r = incrementor.get_tick_amount() / app.incrementors.get_tick_amount();
+        if !incrementor.unlocked {continue;}
+
+        let r = incrementor.clicks / incrementor.max_clicks;
         
         let line_gauge = LineGauge::default()
-            .block(Block::default().title(format!("{} +{:.2} (Total Earned: {:.2})", incrementor.name, incrementor.get_tick_amount(), incrementor.earned_clicks)))
-            .gauge_style(Style::default().fg(Color::Magenta))
+            .block(Block::default().title(format!("{} +{:.2} (Total Earned: {:.2})", incrementor.name, incrementor.max_clicks, incrementor.total_earned)))
+            .gauge_style(Style::default().fg(incrementor.colour))
             .line_set(symbols::line::NORMAL)
             .ratio(
                 if r.is_nan() {0.0} else {r}
@@ -65,7 +67,7 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
         format!(
             "\nClicks: {:.2} (+ {:.2})\n\nAll Time Clicks: {:.2}",
             app.total_clicks,
-            app.incrementors.get_tick_amount(),
+            0.0,
             app.all_time_total_clicks
         ))
         .block(block);
@@ -75,11 +77,10 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
 fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
     let items: Vec<ListItem> = app.incrementors.list.iter().map(|incr| {
         ListItem::new(
-            format!(
-                "{} (x{}) | Price: {:.2}", 
-                incr.name, 
-                incr.cores, 
-                incr.price)
+            Spans::from(vec![
+                Span::styled("• ", Style::default().fg(incr.colour)),
+                Span::raw(format!("{:<23} {:.2}", incr.name, incr.price)),
+            ])
         ).style(
             // Style item green if it can be purchased.
             if incr.price <= app.total_clicks {
@@ -185,8 +186,8 @@ fn draw_main_panel<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     .margin(0)
     .constraints(
         [
-            Constraint::Percentage(25),
-            Constraint::Percentage(55),
+            Constraint::Percentage(10),
+            Constraint::Percentage(70),
             Constraint::Percentage(20),
         ].as_ref()
     )
