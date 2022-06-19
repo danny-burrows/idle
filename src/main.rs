@@ -1,6 +1,7 @@
 mod ui;
 mod app;
 mod shop;
+mod incrementor;
 
 use std::io;
 use tui::{

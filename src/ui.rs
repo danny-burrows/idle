@@ -31,7 +31,7 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &Idle, chunk_rect: Rect) {
 
 
     // Get the required number of constraints for all incrementors.
-    let mut constraints: Vec<Constraint> = app.incrementors.list.iter().filter(|i| i.unlocked).map(|_f| {Constraint::Length(3)}).collect();
+    let mut constraints: Vec<Constraint> = app.incrementors.iter().filter(|i| i.unlocked).map(|_f| {Constraint::Length(3)}).collect();
 
     // Extra constraint for stats.
     constraints.push(Constraint::Percentage(20));
@@ -44,7 +44,7 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &Idle, chunk_rect: Rect) {
 
     // Draw all incrementor gauges.
     let mut chnk = 0;
-    for incrementor in app.incrementors.list.iter() {
+    for incrementor in app.incrementors.iter() {
 
         if !incrementor.unlocked {continue;}
 

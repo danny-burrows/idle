@@ -56,3 +56,12 @@ impl Shop {
         return Err(Error::new(ErrorKind::Other, "oh no!"));
     }
 }
+
+impl Default for Shop {   
+    fn default() -> Self {
+        Shop {
+            items: vec![],
+            state: ListState::default()
+        }
+    }
+}
