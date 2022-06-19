@@ -1,4 +1,4 @@
-use crate::app::Idle;
+use crate::{app::Idle, shop::{Shop, ShopItem}};
 use tui::{
     backend::Backend,
     widgets::{Block, List, ListItem, Borders, LineGauge, Sparkline, Paragraph, Chart, Axis, Dataset, GraphType},
@@ -18,7 +18,7 @@ fn style_title(title_text: &str) -> Span {
     )
 }
 
-fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
+fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &Idle, chunk_rect: Rect) {
 
     // Draw stats border.
     let border_block = Block::default()
@@ -74,21 +74,41 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
     f.render_widget(paragraph, stats_chunks[chnk]);
 }
 
-fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
-    let items: Vec<ListItem> = app.incrementors.list.iter().map(|incr| {
-        ListItem::new(
-            Spans::from(vec![
-                Span::styled("• ", Style::default().fg(incr.colour)),
-                Span::raw(format!("{:<23} {:.2}", (if incr.unlocked {incr.name} else {"Purchase to Unlock"}), incr.price)),
-            ])
-        ).style(
-            // Style item green if it can be purchased.
-            if incr.price <= app.total_clicks {
-                Style::default().fg(Color::LightGreen)
-            } else {
-                Style::default()
+fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &Idle, shop: &mut Shop, chunk_rect: Rect) {
+    let items: Vec<ListItem> = shop.items.iter().map(|item| {
+
+        match item {
+            ShopItem::IncrementorPurchase{ text, price, colour, incrementor_index:_} => {
+                ListItem::new(
+                    Spans::from(vec![
+                        Span::styled("• ", Style::default().fg(*colour)),
+                        Span::raw(format!("{:<23} {:.2}", text, price)),
+                    ])
+                ).style(
+                    // Style item green if it can be purchased.
+                    if *price <= app.total_clicks {
+                        Style::default().fg(Color::LightGreen)
+                    } else {
+                        Style::default()
+                    }
+                )
             }
-        )
+            ShopItem::IncrementorUpgrade{ text, price, colour, incrementor_index:_} => {
+                ListItem::new(
+                    Spans::from(vec![
+                        Span::styled("▲ ", Style::default().fg(*colour)),
+                        Span::raw(format!("{:<23} {:.2}", text, price)),
+                    ])
+                ).style(
+                    // Style item green if it can be purchased.
+                    if *price <= app.total_clicks {
+                        Style::default().fg(Color::LightGreen)
+                    } else {
+                        Style::default()
+                    }
+                )
+            }
+        }        
     }).collect();
 
     let list = List::new(items)
@@ -96,7 +116,7 @@ fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC).add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
-    f.render_stateful_widget(list, chunk_rect, &mut app.incrementors.state);
+    f.render_stateful_widget(list, chunk_rect, &mut shop.state);
 }
 
 fn draw_sparkline<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
@@ -128,7 +148,7 @@ fn draw_sparkline<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     f.render_widget(sparkline, rect);
 }
 
-fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
+fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &Idle, rect: Rect) {
 
     // Enumerate graph (y) data with its index (x).
     let use_data: Vec<(f64, f64)> = app.graph_data.iter().enumerate().map(|(i, it)| (i as f64, *it)).collect();
@@ -170,7 +190,7 @@ fn draw_graph<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     f.render_widget(chart, rect);
 }
 
-fn draw_chat<B: Backend>(f: &mut Frame<B>, _app: &mut Idle, rect: Rect) {
+fn draw_chat<B: Backend>(f: &mut Frame<B>, _app: &Idle, rect: Rect) {
     let block = Block::default()
     .title(style_title(" Chat "))
     .borders(Borders::ALL);
@@ -198,7 +218,7 @@ fn draw_main_panel<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     draw_chat(f, app, chunks[2]);    
 }
 
-fn draw_sidebar<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {    
+fn draw_sidebar<B: Backend>(f: &mut Frame<B>, app: &Idle, shop: &mut Shop, chunk_rect: Rect) {    
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(0)
@@ -211,10 +231,10 @@ fn draw_sidebar<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) 
         .split(chunk_rect);
 
     draw_stats(f, app, chunks[0]);    
-    draw_shop(f, app, chunks[1]);
+    draw_shop(f, app, shop, chunks[1]);
 }
 
-pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
+pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle, shop: &mut Shop) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -226,5 +246,5 @@ pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
         .split(f.size());
 
     draw_main_panel(f, app, chunks[0]);
-    draw_sidebar(f, app, chunks[1]);
+    draw_sidebar(f, app, shop, chunks[1]);
 }

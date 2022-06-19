@@ -10,6 +10,7 @@ use tui::{
 };
 use crossterm::event::{self, Event, KeyCode};
 use crate::ui::draw_ui;
+use crate::shop::{Shop, ShopItem};
 
 pub struct Incrementor {
     pub name: &'static str,
@@ -52,25 +53,6 @@ impl Incrementor {
 
 pub struct Incrementors {
     pub list: [Incrementor; 5],
-    pub state: ListState
-}
-
-impl Incrementors {
-    fn next(&mut self) {
-        if let Some(current_select) = self.state.selected() {
-            if current_select < self.list.len() - 1 {
-                self.state.select(Some(current_select + 1));
-            }
-        }
-    }
-
-    fn prev(&mut self) {
-        if let Some(current_select) = self.state.selected() {
-            if current_select > 0 {
-                self.state.select(Some(current_select - 1));
-            }
-        }
-    }
 }
 
 pub struct Idle {
@@ -97,7 +79,9 @@ impl Idle {
             self.inc += i.round() as u64;
         }
 
-        self.sparkline_data.push(self.inc);
+        if self.inc > 0 {
+            self.sparkline_data.push(self.inc);
+        }
         
         self.graph_data.push(self.total_clicks);
         
@@ -110,8 +94,7 @@ impl Idle {
 }
 
 pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
-    
-    let tick_rate = Duration::from_millis(250);
+    let tick_rate = Duration::from_millis(15);
 
     let mut app = Idle {
         total_clicks: 1.0,
@@ -127,26 +110,26 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
                     colour: Color::LightBlue,
                     unlocked: true,
 
-                    clicks:0.0,
+                    clicks: 0.0,
                     spare: 0.0,
-                    increment_by: 0.1,
+                    increment_by: 0.002,
                     max_clicks: 1.0,
                     total_earned: 0.0,
                     price: 1.0,
-                    price_mult: 1.5
+                    price_mult: 1.4
                 },
                 Incrementor {
                     name: "Better Incrementor",
                     colour: Color::LightGreen,
                     unlocked: false,
 
-                    clicks:0.0,
+                    clicks: 0.0,
                     spare: 0.0,
-                    increment_by: 0.5,
+                    increment_by: 0.008,
                     max_clicks: 5.0,
                     total_earned: 0.0,
-                    price: 100.0,
-                    price_mult: 1.5
+                    price: 10.0,
+                    price_mult: 1.4
                 },
                 Incrementor {
                     name: "Improved Incrementor",
@@ -155,11 +138,11 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
 
                     clicks:0.0,
                     spare: 0.0,
-                    increment_by: 1.5,
-                    max_clicks: 10.0,
+                    increment_by: 0.1,
+                    max_clicks: 20.0,
                     total_earned: 0.0,
-                    price: 1000.0,
-                    price_mult: 2.0
+                    price: 100.0,
+                    price_mult: 1.4
                 },
                 Incrementor {
                     name: "Super Incrementor",
@@ -168,11 +151,11 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
                     
                     clicks:0.0,
                     spare: 0.0,
-                    increment_by: 3.0,
+                    increment_by: 0.1,
                     max_clicks: 50.0,
                     total_earned: 0.0,
-                    price: 5000.0,
-                    price_mult: 2.0
+                    price: 250.0,
+                    price_mult: 1.3
                 },
                 Incrementor {
                     name: "God Mode.",
@@ -181,58 +164,100 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
 
                     clicks:0.0,
                     spare: 0.0,
-                    increment_by: 10.0,
+                    increment_by: 1.0,
                     max_clicks: 100.0,
                     total_earned: 0.0,
-                    price: 50000.0,
-                    price_mult: 2.5
+                    price: 1000.0,
+                    price_mult: 2.0
                 }],
-            state: ListState::default() 
         }
     };
 
-    app.incrementors.state.select(Some(0));
+    let mut shop = Shop {
+        items: vec![],
+        state: ListState::default()
+    };
+
+    // Add all incrementors to the shop list.
+    shop.items.append(&mut app.incrementors.list.iter().enumerate().map(|(i, inc)| 
+        ShopItem::IncrementorPurchase {
+            text: inc.name.to_string(),
+            price: inc.price,
+            colour: inc.colour,
+            incrementor_index: i,
+        }
+    ).collect());
+    shop.state.select(Some(0));
     
+
     let mut last_tick = Instant::now();
     loop {
-        terminal.draw(|frame| draw_ui(frame, &mut app))?;
+        terminal.draw(|frame| draw_ui(frame, &mut app, &mut shop))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
-        
+
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
-    
+
                 match key.code {
                     KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Up => app.incrementors.prev(),
-                    KeyCode::Down => app.incrementors.next(),
+                    KeyCode::Up => shop.prev(),
+                    KeyCode::Down => shop.next(),
                     KeyCode::Enter => {
+                        let mut remove_shop_item = (false, 0);
+                        let mut new_shop_items: Vec<ShopItem> = vec![];
+
+                        // Needing this makes my blood boil.
+                        let curr_index = shop.state.selected().unwrap();
                         
-                        // Get selected incrementor.
-                        let i = app.incrementors.state.selected().unwrap(); 
-                        let incrementor = app.incrementors.list.get_mut(i).unwrap();
+                        // Get selected shop item.
+                        let s = shop.get_mut_selected()?;
+                        match s {
+                            ShopItem::IncrementorPurchase{ text: _, price, colour, incrementor_index} => {
+                                if let Some(i) = app.incrementors.list.get_mut(*incrementor_index) {
+                                    
+                                    // If we can afford it; pay for it and unlock.
+                                    if app.total_clicks >= *price {
+                                        app.total_clicks -= *price;
+                                        i.unlocked = true;
+                                    
+                                        remove_shop_item = (true, curr_index);
+                                        new_shop_items.push(
+                                            ShopItem::IncrementorUpgrade { 
+                                                text: format!("Upgrade {}", i.name), 
+                                                price: *price * 2.0,
+                                                colour: *colour,
+                                                incrementor_index: *incrementor_index 
+                                            }
+                                        );
+                                    }
+                                }
+                            }
+                            ShopItem::IncrementorUpgrade{ text: _, price, colour:_, incrementor_index} => {
+                                if let Some(i) = app.incrementors.list.get_mut(*incrementor_index) {
 
-                        // Attempt purchase.
-                        if app.total_clicks >= incrementor.price {
-                            app.total_clicks -= incrementor.price;
+                                    // If we can afford it; do the upgrade.
+                                    if app.total_clicks >= *price {
+                                        app.total_clicks -= *price;
 
-                            if incrementor.unlocked {
-                                incrementor.increment_by *= 1.23;
-                                incrementor.max_clicks *= 1.2;
-                                
-                                incrementor.price *= incrementor.price_mult;
-                            } else {
-                                incrementor.unlocked = true;
+                                        i.increment_by *= 1.25;
+                                        i.max_clicks   *= 1.22;
+
+                                        *price *= i.price_mult;
+                                    }
+                                }
                             }
                         }
 
-                    },
-                    KeyCode::Char('s') => {
-                        if app.total_clicks >= 10.0 {
-                            app.total_clicks -= 10.0;
+                        // Remove shop items if needed...
+                        if remove_shop_item.0 {
+                            shop.items.remove(remove_shop_item.1);
                         }
+
+                        // Add any new shop items to the shop...
+                        shop.items.append(&mut new_shop_items);
                     },
                     _ => {}
                 }

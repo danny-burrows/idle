@@ -1,5 +1,6 @@
 mod ui;
 mod app;
+mod shop;
 
 use std::io;
 use tui::{
