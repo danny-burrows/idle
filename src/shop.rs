@@ -47,10 +47,10 @@ impl Shop {
         return Err(Error::new(ErrorKind::Other, "oh no!"));
     }
 
-    pub fn get_mut_selected(&mut self) -> Result<&mut ShopItem, Error> {
+    pub fn get_mut_selected_with_index(&mut self) -> Result<(usize, &mut ShopItem), Error> {
         if let Some(selected_i) = self.state.selected() {
             if let Some(shop_item) = self.items.get_mut(selected_i) {
-                return Ok(shop_item);
+                return Ok((selected_i, shop_item));
             }
         }
         return Err(Error::new(ErrorKind::Other, "oh no!"));

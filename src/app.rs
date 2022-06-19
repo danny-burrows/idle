@@ -208,13 +208,11 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
                     KeyCode::Enter => {
                         let mut remove_shop_item = (false, 0);
                         let mut new_shop_items: Vec<ShopItem> = vec![];
-
-                        // Needing this makes my blood boil.
-                        let curr_index = shop.state.selected().unwrap();
                         
                         // Get selected shop item.
-                        let s = shop.get_mut_selected()?;
-                        match s {
+                        let (indx, selected) = shop.get_mut_selected_with_index()?;
+
+                        match selected {
                             ShopItem::IncrementorPurchase{ text: _, price, colour, incrementor_index} => {
                                 if let Some(i) = app.incrementors.list.get_mut(*incrementor_index) {
                                     
@@ -223,7 +221,7 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
                                         app.total_clicks -= *price;
                                         i.unlocked = true;
                                     
-                                        remove_shop_item = (true, curr_index);
+                                        remove_shop_item = (true, indx);
                                         new_shop_items.push(
                                             ShopItem::IncrementorUpgrade { 
                                                 text: format!("Upgrade {}", i.name), 
