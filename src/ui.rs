@@ -1,4 +1,7 @@
-use crate::{app::Idle, shop::{Shop, ShopItem}};
+use crate::{
+    app::Idle, 
+    shop::ShopItem
+};
 use tui::{
     backend::Backend,
     widgets::{Block, List, ListItem, Borders, LineGauge, Sparkline, Paragraph, Chart, Axis, Dataset, GraphType},
@@ -74,8 +77,8 @@ fn draw_stats<B: Backend>(f: &mut Frame<B>, app: &Idle, chunk_rect: Rect) {
     f.render_widget(paragraph, stats_chunks[chnk]);
 }
 
-fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &Idle, shop: &mut Shop, chunk_rect: Rect) {
-    let items: Vec<ListItem> = shop.items.iter().map(|item| {
+fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {
+    let items: Vec<ListItem> = app.shop.items.iter().map(|item| {
 
         match item {
             ShopItem::IncrementorPurchase{ text, price, colour, incrementor_index:_} => {
@@ -116,7 +119,7 @@ fn draw_shop<B: Backend>(f: &mut Frame<B>, app: &Idle, shop: &mut Shop, chunk_re
         .highlight_style(Style::default().add_modifier(Modifier::ITALIC).add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
-    f.render_stateful_widget(list, chunk_rect, &mut shop.state);
+    f.render_stateful_widget(list, chunk_rect, &mut app.shop.state);
 }
 
 fn draw_sparkline<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
@@ -218,7 +221,7 @@ fn draw_main_panel<B: Backend>(f: &mut Frame<B>, app: &mut Idle, rect: Rect) {
     draw_chat(f, app, chunks[2]);    
 }
 
-fn draw_sidebar<B: Backend>(f: &mut Frame<B>, app: &Idle, shop: &mut Shop, chunk_rect: Rect) {    
+fn draw_sidebar<B: Backend>(f: &mut Frame<B>, app: &mut Idle, chunk_rect: Rect) {    
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(0)
@@ -231,10 +234,10 @@ fn draw_sidebar<B: Backend>(f: &mut Frame<B>, app: &Idle, shop: &mut Shop, chunk
         .split(chunk_rect);
 
     draw_stats(f, app, chunks[0]);    
-    draw_shop(f, app, shop, chunks[1]);
+    draw_shop(f, app, chunks[1]);
 }
 
-pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle, shop: &mut Shop) {
+pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -246,5 +249,5 @@ pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut Idle, shop: &mut Shop) {
         .split(f.size());
 
     draw_main_panel(f, app, chunks[0]);
-    draw_sidebar(f, app, shop, chunks[1]);
+    draw_sidebar(f, app, chunks[1]);
 }

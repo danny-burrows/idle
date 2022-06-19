@@ -62,7 +62,8 @@ pub struct Idle {
     pub sparkline_max_length: usize,
     pub sparkline_data: Vec<u64>,
     pub graph_data: Vec<f64>,
-    pub incrementors: Incrementors
+    pub incrementors: Incrementors,
+    pub shop: Shop
 }
 
 impl Idle {
@@ -170,16 +171,15 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
                     price: 1000.0,
                     price_mult: 2.0
                 }],
-        }
-    };
-
-    let mut shop = Shop {
-        items: vec![],
-        state: ListState::default()
+            },
+            shop: Shop {
+                items: vec![],
+                state: ListState::default()
+            }
     };
 
     // Add all incrementors to the shop list.
-    shop.items.append(&mut app.incrementors.list.iter().enumerate().map(|(i, inc)| 
+    app.shop.items.append(&mut app.incrementors.list.iter().enumerate().map(|(i, inc)| 
         ShopItem::IncrementorPurchase {
             text: inc.name.to_string(),
             price: inc.price,
@@ -187,12 +187,12 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
             incrementor_index: i,
         }
     ).collect());
-    shop.state.select(Some(0));
+    app.shop.state.select(Some(0));
     
 
     let mut last_tick = Instant::now();
     loop {
-        terminal.draw(|frame| draw_ui(frame, &mut app, &mut shop))?;
+        terminal.draw(|frame| draw_ui(frame, &mut app))?;
 
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
@@ -203,14 +203,14 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
 
                 match key.code {
                     KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Up => shop.prev(),
-                    KeyCode::Down => shop.next(),
+                    KeyCode::Up => app.shop.prev(),
+                    KeyCode::Down => app.shop.next(),
                     KeyCode::Enter => {
                         let mut remove_shop_item = (false, 0);
                         let mut new_shop_items: Vec<ShopItem> = vec![];
                         
                         // Get selected shop item.
-                        let (indx, selected) = shop.get_mut_selected_with_index()?;
+                        let (indx, selected) = app.shop.get_mut_selected_with_index()?;
 
                         match selected {
                             ShopItem::IncrementorPurchase{ text: _, price, colour, incrementor_index} => {
@@ -251,11 +251,11 @@ pub fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
 
                         // Remove shop items if needed...
                         if remove_shop_item.0 {
-                            shop.items.remove(remove_shop_item.1);
+                            app.shop.items.remove(remove_shop_item.1);
                         }
 
                         // Add any new shop items to the shop...
-                        shop.items.append(&mut new_shop_items);
+                        app.shop.items.append(&mut new_shop_items);
                     },
                     _ => {}
                 }
